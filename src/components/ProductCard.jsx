@@ -1,25 +1,31 @@
 import React, { useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import { Web3Context } from '../context/Web3Context';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useContext(CartContext);
-  const { buyItem, isConnected } = useContext(Web3Context);
+  const { buyItem, isConnected, connectWallet } = useContext(Web3Context);
+  const navigate = useNavigate();
   
   const handleAddToCart = () => {
     addToCart(product);
+    // Optional: Show a success message
+    alert(`${product.name} added to cart!`);
   };
   
   const handleBuyNow = async () => {
     if (!isConnected) {
-      alert('Please connect your wallet first!');
+      const confirm = window.confirm('Please connect your wallet first. Connect now?');
+      if (confirm) {
+        await connectWallet();
+      }
       return;
     }
     
-    const success = await buyItem(product.id, product.price);
-    if (success) {
-      alert(`Successfully purchased ${product.name}!`);
-    }
+    // Add item to cart and navigate to checkout
+    addToCart(product);
+    navigate('/checkout');
   };
   
   return (
