@@ -32,7 +32,7 @@ export const MOCK_PRODUCTS = {
       name: "Signed Virat Kohli Bat",
       description: "Official bat signed by Virat Kohli from 2023 World Cup",
       image: "https://via.placeholder.com/300x200?text=Kohli+Bat",
-      price: "0.5",
+      price: "0.05",
       category: "cricket",
       seller: "0x0000000000000000000000000000000000000000",
       sold: false
@@ -52,7 +52,7 @@ export const MOCK_PRODUCTS = {
       name: "Cricket World Cup Ticket",
       description: "Commemorative ticket from 2023 Cricket World Cup Final",
       image: "https://via.placeholder.com/300x200?text=WC+Ticket",
-      price: "0.3",
+      price: "0.03",
       category: "cricket",
       seller: "0x0000000000000000000000000000000000000000",
       sold: false
@@ -116,7 +116,7 @@ export const MOCK_PRODUCTS = {
       name: "Autographed Championship Photo",
       description: "Signed photo from the World Badminton Championship",
       image: "https://via.placeholder.com/300x200?text=Championship+Photo",
-      price: "0.3",
+      price: "0.03",
       category: "badminton",
       seller: "0x0000000000000000000000000000000000000000",
       sold: false
