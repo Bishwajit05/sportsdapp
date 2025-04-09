@@ -1,11 +1,30 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Web3Context } from '../context/Web3Context';
 import { CartContext } from '../context/CartContext';
+import { ethers } from 'ethers';
 
 const Header = () => {
-  const { account, isConnected, connectWallet, disconnectWallet } = useContext(Web3Context);
+  const { account, isConnected, connectWallet, disconnectWallet, provider } = useContext(Web3Context);
   const { cartItems } = useContext(CartContext);
+  const [balance, setBalance] = useState('0');
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (isConnected && provider && account) {
+        try {
+          const balanceWei = await provider.getBalance(account);
+          const balanceEth = ethers.utils.formatEther(balanceWei);
+          setBalance(parseFloat(balanceEth).toFixed(4));
+        } catch (error) {
+          console.error('Error fetching balance:', error);
+          setBalance('0');
+        }
+      }
+    };
+
+    fetchBalance();
+  }, [isConnected, provider, account]);
 
   return (
     <header className="bg-gray-800 text-white py-4">
@@ -48,6 +67,9 @@ const Header = () => {
           
           {isConnected ? (
             <div className="flex items-center space-x-2">
+              <span className="text-sm px-2 py-1 bg-gray-700 rounded">
+                {balance} ETH
+              </span>
               <span className="text-sm hidden md:inline">
                 {account.slice(0, 6)}...{account.slice(-4)}
               </span>
