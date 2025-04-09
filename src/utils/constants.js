@@ -42,7 +42,7 @@ export const MOCK_PRODUCTS = {
       name: "India Team Jersey 2023",
       description: "Official India cricket team jersey from 2023 season",
       image: "https://via.placeholder.com/300x200?text=India+Jersey",
-      price: "0.2",
+      price: "0.002",
       category: "cricket",
       seller: "0x0000000000000000000000000000000000000000",
       sold: false
@@ -106,7 +106,7 @@ export const MOCK_PRODUCTS = {
       name: "Olympic Badminton Shuttlecock",
       description: "Official shuttlecock used in Olympic badminton finals",
       image: "https://via.placeholder.com/300x200?text=Olympic+Shuttlecock",
-      price: "0.2",
+      price: "0.002",
       category: "badminton",
       seller: "0x0000000000000000000000000000000000000000",
       sold: false
