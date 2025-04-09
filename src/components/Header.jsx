@@ -48,7 +48,7 @@ const Header = () => {
           </Link>
           {isConnected && (
             <Link to="/profile" className="hover:text-gray-300">
-              My Listings
+              My Profile
             </Link>
           )}
         </nav>

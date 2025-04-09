@@ -1,4 +1,3 @@
-// hardhat.config.js
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-ethers");
 require("dotenv").config();
@@ -14,6 +13,11 @@ module.exports = {
     },
     localhost: {
       url: "http://127.0.0.1:8545"
+    },
+    sepolia: {
+      url: `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}`,
+      accounts: [PRIVATE_KEY],
+      chainId: 11155111
     }
   },
   paths: {
