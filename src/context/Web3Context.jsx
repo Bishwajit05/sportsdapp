@@ -14,6 +14,7 @@ export const Web3Provider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [chainId, setChainId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [balance, setBalance] = useState('0');
 
   // Initialize web3modal
   const web3Modal = new Web3Modal({
@@ -21,6 +22,20 @@ export const Web3Provider = ({ children }) => {
     cacheProvider: true,
     providerOptions: {}
   });
+
+  // Fetch user balance
+  const fetchBalance = useCallback(async () => {
+    if (provider && account) {
+      try {
+        const balanceWei = await provider.getBalance(account);
+        const balanceEth = ethers.utils.formatEther(balanceWei);
+        setBalance(parseFloat(balanceEth).toFixed(4));
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        setBalance('0');
+      }
+    }
+  }, [provider, account]);
 
   // Connect wallet
   const connectWallet = useCallback(async () => {
@@ -48,11 +63,20 @@ export const Web3Provider = ({ children }) => {
 
       // Set up listeners
       instance.on("accountsChanged", (accounts) => {
-        setAccount(accounts[0]);
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+        } else {
+          // If user disconnected through MetaMask UI
+          disconnectWallet();
+        }
       });
 
       instance.on("chainChanged", async () => {
         window.location.reload();
+      });
+
+      instance.on("disconnect", () => {
+        disconnectWallet();
       });
     } catch (error) {
       console.error("Connection error:", error);
@@ -70,6 +94,7 @@ export const Web3Provider = ({ children }) => {
       setProvider(null);
       setSigner(null);
       setContract(null);
+      setBalance('0');
     } catch (error) {
       console.error("Disconnect error:", error);
     }
@@ -81,6 +106,13 @@ export const Web3Provider = ({ children }) => {
       connectWallet();
     }
   }, [connectWallet]);
+
+  // Update balance when account changes
+  useEffect(() => {
+    if (isConnected && account) {
+      fetchBalance();
+    }
+  }, [isConnected, account, fetchBalance]);
 
   // Function to fetch items from a category
   const fetchItemsByCategory = useCallback(async (category) => {
@@ -109,18 +141,33 @@ export const Web3Provider = ({ children }) => {
     try {
       setIsLoading(true);
       const priceInWei = ethers.utils.parseEther(price.toString());
-      const transaction = await contract.purchaseMarketItem(itemId, {
+      
+      // Add gas estimate with buffer to ensure transaction goes through
+      const gasEstimate = await contract.estimateGas.purchaseMarketItem(itemId, {
         value: priceInWei
       });
-      await transaction.wait();
+      const gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
+      
+      const transaction = await contract.purchaseMarketItem(itemId, {
+        value: priceInWei,
+        gasLimit
+      });
+      
+      const receipt = await transaction.wait();
+      
+      // Update balance after purchase
+      await fetchBalance();
+      
+      console.log("Purchase successful!", receipt);
       setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error buying item:", error);
+      alert(`Transaction failed: ${error.message}`);
       setIsLoading(false);
       return false;
     }
-  }, [contract, account]);
+  }, [contract, account, fetchBalance]);
 
   // Function to create a new listing
   const createListing = useCallback(async (name, description, image, price, category) => {
@@ -128,22 +175,40 @@ export const Web3Provider = ({ children }) => {
     try {
       setIsLoading(true);
       const priceInWei = ethers.utils.parseEther(price.toString());
-      const transaction = await contract.createMarketItem(
+      
+      // Add gas estimate with buffer
+      const gasEstimate = await contract.estimateGas.createMarketItem(
         name,
         description,
         image,
         priceInWei,
         category
       );
+      const gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
+      
+      const transaction = await contract.createMarketItem(
+        name,
+        description,
+        image,
+        priceInWei,
+        category,
+        { gasLimit }
+      );
+      
       await transaction.wait();
+      
+      // Update balance after listing creation
+      await fetchBalance();
+      
       setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error creating listing:", error);
+      alert(`Listing creation failed: ${error.message}`);
       setIsLoading(false);
       return false;
     }
-  }, [contract, account]);
+  }, [contract, account, fetchBalance]);
 
   return (
     <Web3Context.Provider
@@ -155,11 +220,13 @@ export const Web3Provider = ({ children }) => {
         isConnected,
         chainId,
         isLoading,
+        balance,
         connectWallet,
         disconnectWallet,
         fetchItemsByCategory,
         buyItem,
-        createListing
+        createListing,
+        fetchBalance
       }}
     >
       {children}
