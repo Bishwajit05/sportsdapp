@@ -1,17 +1,59 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import { Web3Context } from '../context/Web3Context';
 import Cart from '../components/Cart';
-import { ethers } from 'ethers';
+
+// Custom Toast Component
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const typeStyles = {
+    success: 'bg-green-500',
+    error: 'bg-red-500',
+    warning: 'bg-yellow-500',
+    info: 'bg-blue-500'
+  };
+
+  return (
+    <div 
+      className={`fixed top-4 right-4 z-50 px-4 py-2 text-white rounded-lg shadow-lg transition-all duration-300 ${typeStyles[type] || typeStyles.info}`}
+    >
+      {message}
+    </div>
+  );
+};
 
 const Checkout = () => {
   const { cartItems, totalPrice, clearCart } = useContext(CartContext);
-  const { account, isConnected, connectWallet, buyItem, isLoading, provider, balance, chainId } = useContext(Web3Context);
+  const { 
+    account, 
+    isConnected, 
+    connectWallet, 
+    buyItem, 
+    isLoading, 
+    balance, 
+    chainId 
+  } = useContext(Web3Context);
+  
   const [processingPayment, setProcessingPayment] = useState(false);
   const [networkName, setNetworkName] = useState('');
-  const navigate = useNavigate();
   
+  // Toast state
+  const [toast, setToast] = useState(null);
+
+  // Show toast notification
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+  };
+
+  // Close toast notification
+  const closeToast = () => {
+    setToast(null);
+  };
+
   useEffect(() => {
     const getNetworkName = () => {
       // ChainId for Sepolia is 11155111
@@ -32,58 +74,105 @@ const Checkout = () => {
   }, [chainId, isConnected]);
   
   const handleCheckout = async () => {
+    // Wallet connection check
     if (!isConnected) {
-      const confirm = window.confirm('Please connect your wallet first. Connect now?');
+      showToast('Please connect your wallet first', 'warning');
+      
+      const confirm = window.confirm('Connect wallet now?');
       if (confirm) {
         await connectWallet();
       }
       return;
     }
     
+    // Cart empty check
     if (cartItems.length === 0) {
-      alert('Your cart is empty');
+      showToast('Your cart is empty', 'warning');
       return;
     }
 
-    // Check if user is on Sepolia or local network
+    // Network check
     if (chainId !== 11155111 && chainId !== 1337 && chainId !== 31337) {
-      alert('Please switch to Sepolia testnet in your MetaMask wallet to complete this purchase.');
+      showToast('Please switch to Sepolia testnet in your MetaMask wallet', 'error');
       return;
     }
 
-    // Correctly compare numeric values
+    // Balance check
     if (parseFloat(balance) < parseFloat(totalPrice)) {
-      alert(`Insufficient balance. You need at least ${totalPrice.toFixed(4)} ${networkName} ETH to complete this purchase.`);
+      showToast(`Insufficient balance. You need at least ${totalPrice.toFixed(4)} ${networkName} ETH`, 'error');
       return;
     }
     
     setProcessingPayment(true);
     
     try {
+      // Track successful and failed purchases
+      const purchaseResults = [];
+
       // Process each item in cart
       for (const item of cartItems) {
-        const success = await buyItem(item.id, item.price);
-        if (!success) {
-          alert(`Failed to purchase ${item.name}. Transaction was not completed.`);
-          setProcessingPayment(false);
-          return;
+        try {
+          const success = await buyItem(item.id, item.price);
+          
+          if (success) {
+            purchaseResults.push({
+              item: item.name,
+              status: 'success'
+            });
+            
+            showToast(`Successfully purchased ${item.name}`, 'success');
+          } else {
+            purchaseResults.push({
+              item: item.name,
+              status: 'failed'
+            });
+            
+            showToast(`Failed to purchase ${item.name}`, 'error');
+          }
+        } catch (itemError) {
+          purchaseResults.push({
+            item: item.name,
+            status: 'failed'
+          });
+          
+          showToast(`Error purchasing ${item.name}: ${itemError.message}`, 'error');
         }
       }
       
-      // If all transactions were successful
-      alert('Payment completed successfully!');
-      clearCart();
-      navigate('/');
+      // Check if all purchases were successful
+      const allSuccessful = purchaseResults.every(result => result.status === 'success');
+      
+      if (allSuccessful) {
+        showToast('All items purchased successfully!', 'success');
+        clearCart();
+        // You can add navigation logic here if needed
+      } else {
+        // Some items failed
+        const failedItems = purchaseResults
+          .filter(result => result.status === 'failed')
+          .map(result => result.item);
+        
+        showToast(`Some items could not be purchased: ${failedItems.join(', ')}`, 'warning');
+      }
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('An error occurred during checkout. Please try again.');
+      showToast('An unexpected error occurred during checkout', 'error');
     } finally {
       setProcessingPayment(false);
     }
   };
   
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 relative">
+      {/* Toast Notification */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={closeToast} 
+        />
+      )}
+      
       <h1 className="text-3xl font-bold mb-8">Checkout</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
