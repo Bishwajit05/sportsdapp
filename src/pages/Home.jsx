@@ -1,7 +1,18 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useContext } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Web3Context } from '../context/Web3Context';
 
 const Home = () => {
+  const { isConnected, connectWallet } = useContext(Web3Context);
+  const navigate = useNavigate();
+
+  const handleConnectOrAccount = () => {
+    if (isConnected) {
+      navigate('/profile');
+    } else {
+      connectWallet();
+    }
+  };
   const categories = [
     {
       id: 1,
@@ -25,7 +36,6 @@ const Home = () => {
       path: '/badminton'
     }
   ];
-
   return (
     <div>
       {/* Hero Section */}
@@ -42,12 +52,12 @@ const Home = () => {
             >
               Start Shopping
             </Link>
-            <Link
-              to="/profile"
+            <button
+              onClick={handleConnectOrAccount}
               className="bg-transparent border-2 border-white hover:bg-white hover:text-blue-600 px-6 py-3 rounded-lg font-semibold transition duration-300"
             >
-              My Account
-            </Link>
+              {isConnected ? 'My Account' : 'Connect Wallet'}
+            </button>
           </div>
         </div>
       </div>
