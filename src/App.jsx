@@ -10,6 +10,7 @@ import Football from './pages/Football';
 import Badminton from './pages/Badminton';
 import Checkout from './pages/Checkout';
 import Profile from './pages/Profile';
+import AddItem from './pages/AddItem';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
                 <Route path="/badminton" element={<Badminton />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/add-item" element={<AddItem />} />
               </Routes>
             </main>
             <Footer />

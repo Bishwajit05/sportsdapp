@@ -47,9 +47,14 @@ const Header = () => {
             Badminton
           </Link>
           {isConnected && (
-            <Link to="/profile" className="hover:text-gray-300">
-              My Profile
-            </Link>
+            <>
+              <Link to="/profile" className="hover:text-gray-300">
+                My Profile
+              </Link>
+              <Link to="/add-item" className="hover:text-gray-300">
+                Add Item
+              </Link>
+            </>
           )}
         </nav>
         
