@@ -23,19 +23,36 @@ export const Web3Provider = ({ children }) => {
     providerOptions: {}
   });
 
-  // Fetch user balance
+  // Fetch user balance from backend
   const fetchBalance = useCallback(async () => {
-    if (provider && account) {
-      try {
-        const balanceWei = await provider.getBalance(account);
-        const balanceEth = ethers.utils.formatEther(balanceWei);
-        setBalance(parseFloat(balanceEth).toFixed(4));
-      } catch (error) {
-        console.error("Error fetching balance:", error);
+    try {
+      if (!account) {
+        console.log('No wallet connected, cannot fetch balance');
         setBalance('0');
+        return;
       }
+      
+      console.log('Fetching balance from backend for address:', account);
+      const response = await fetch(`http://localhost:3001/api/marketplace/balance?address=${account}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Balance data received:', data);
+      setBalance(data.balance);
+    } catch (error) {
+      console.error("Error fetching balance from backend:", error);
+      setBalance('0');
     }
-  }, [provider, account]);
+  }, [account]);
 
   // Connect wallet
   const connectWallet = useCallback(async () => {
@@ -114,51 +131,92 @@ export const Web3Provider = ({ children }) => {
     }
   }, [isConnected, account, fetchBalance]);
 
-  // Function to fetch items from a category
+  // Function to fetch items from a category via API
   const fetchItemsByCategory = useCallback(async (category) => {
-    if (!contract) return [];
     try {
-      const items = await contract.fetchItemsByCategory(category);
-      return items.map(item => ({
-        id: item.itemId.toNumber(),
-        name: item.name,
-        description: item.description,
-        image: item.image,
-        price: ethers.utils.formatEther(item.price),
-        category: item.category,
-        seller: item.seller,
-        sold: item.sold
-      }));
+      console.log(`Fetching ${category} items from backend...`);
+      const response = await fetch(`http://localhost:3001/api/marketplace/items/${category}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Items data received:', data);
+      
+      return data.items || [];
     } catch (error) {
       console.error(`Error fetching ${category} items:`, error);
       return [];
     }
-  }, [contract]);
+  }, []);
 
-  // Function to buy an item
+  // Function to buy an item with real wallet transaction
   const buyItem = useCallback(async (itemId, price) => {
-    if (!contract || !account) return false;
+    if (!contract || !signer || !account) {
+      alert('Please connect your wallet first');
+      return false;
+    }
+    
     try {
       setIsLoading(true);
+      console.log(`Buying item ${itemId} for ${price} using blockchain transaction...`);
+      
+      // First get the item details from backend
+      const response = await fetch(`http://localhost:3001/api/marketplace/items-detail/${itemId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      const itemData = await response.json();
+      console.log('Item data:', itemData);
+      
+      // Convert price to Wei (blockchain format)
       const priceInWei = ethers.utils.parseEther(price.toString());
       
-      // Add gas estimate with buffer to ensure transaction goes through
-      const gasEstimate = await contract.estimateGas.purchaseMarketItem(itemId, {
-        value: priceInWei
-      });
-      const gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
-      
-      const transaction = await contract.purchaseMarketItem(itemId, {
+      // Create and send the transaction
+      const tx = await signer.sendTransaction({
+        to: itemData.item.seller || '0xYourMarketplaceAddress', // Replace with actual seller or marketplace address
         value: priceInWei,
-        gasLimit
+        gasLimit: 100000 // Approximate gas needed
       });
       
-      const receipt = await transaction.wait();
+      console.log('Transaction sent:', tx.hash);
+      
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
+      
+      // Notify backend about successful purchase
+      const purchaseResponse = await fetch('http://localhost:3001/api/marketplace/purchase-complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId,
+          transactionHash: tx.hash,
+          buyer: account
+        })
+      });
       
       // Update balance after purchase
       await fetchBalance();
       
-      console.log("Purchase successful!", receipt);
       setIsLoading(false);
       return true;
     } catch (error) {
@@ -169,35 +227,36 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contract, account, fetchBalance]);
 
-  // Function to create a new listing
+  // Function to create a new listing via backend API
   const createListing = useCallback(async (name, description, image, price, category) => {
-    if (!contract || !account) return false;
     try {
       setIsLoading(true);
-      const priceInWei = ethers.utils.parseEther(price.toString());
+      console.log('Creating new item via backend API...');
       
-      // Add gas estimate with buffer
-      const gasEstimate = await contract.estimateGas.createMarketItem(
-        name,
-        description,
-        image,
-        priceInWei,
-        category
-      );
-      const gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
+      const response = await fetch('http://localhost:3001/api/marketplace/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          description,
+          image,
+          price,
+          category
+        })
+      });
       
-      const transaction = await contract.createMarketItem(
-        name,
-        description,
-        image,
-        priceInWei,
-        category,
-        { gasLimit }
-      );
+      console.log('Response status:', response.status);
       
-      await transaction.wait();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
-      // Update balance after listing creation
+      const data = await response.json();
+      console.log('Item created successfully:', data);
+      
+      // Update balance after item creation
       await fetchBalance();
       
       setIsLoading(false);
